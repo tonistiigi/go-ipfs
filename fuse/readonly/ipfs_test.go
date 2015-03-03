@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	fuse "github.com/jbenet/go-ipfs/Godeps/_workspace/src/bazil.org/fuse"
 	fstest "github.com/jbenet/go-ipfs/Godeps/_workspace/src/bazil.org/fuse/fs/fstestutil"
 
 	core "github.com/jbenet/go-ipfs/core"
@@ -62,6 +63,9 @@ func setupIpfsTest(t *testing.T, node *core.IpfsNode) (*core.IpfsNode, *fstest.M
 
 // Test writing an object and reading it back through fuse
 func TestIpfsBasicRead(t *testing.T) {
+	fuse.Debug = func(msg interface{}) {
+		log.Info(msg)
+	}
 	if testing.Short() {
 		t.SkipNow()
 	}
