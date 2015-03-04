@@ -98,6 +98,7 @@ func CreateRoot(ipfs *core.IpfsNode, keys []ci.PrivKey, ipfspath string) (*Root,
 
 	return &Root{
 		fs:        fi,
+		Ipfs:      ipfs,
 		IpfsRoot:  ipfspath,
 		Keys:      keys,
 		LocalDirs: ldirs,
@@ -300,8 +301,8 @@ func (n *Directory) Fsync(ctx context.Context, req *fuse.FsyncRequest) error {
 	panic("NYI")
 }
 
-func (n *File) Fsync(ctx context.Context, req *fuse.FsyncRequest) error {
-	panic("NYI")
+func (fi *File) Fsync(ctx context.Context, req *fuse.FsyncRequest) error {
+	return fi.fi.Flush()
 }
 
 func (dir *Directory) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, error) {
