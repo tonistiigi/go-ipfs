@@ -3,15 +3,15 @@ package ipns
 import (
 	"bytes"
 	"crypto/rand"
-	//context "github.com/jbenet/go-ipfs/Godeps/_workspace/src/golang.org/x/net/context"
 	"io/ioutil"
 	"os"
 	"testing"
 
 	fstest "github.com/jbenet/go-ipfs/Godeps/_workspace/src/bazil.org/fuse/fs/fstestutil"
 
+	context "github.com/jbenet/go-ipfs/Godeps/_workspace/src/golang.org/x/net/context"
 	core "github.com/jbenet/go-ipfs/core"
-	//u "github.com/jbenet/go-ipfs/util"
+	nsfs "github.com/jbenet/go-ipfs/ipnsfs"
 	ci "github.com/jbenet/go-ipfs/util/testutil/ci"
 )
 
@@ -103,6 +103,13 @@ func setupIpnsTest(t *testing.T, node *core.IpfsNode) (*core.IpfsNode, *fstest.M
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		ipnsfs, err := nsfs.NewFilesystem(context.TODO(), node.DAG, node.Namesys, node.Pinning, node.PrivateKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		node.IpnsFs = ipnsfs
 	}
 
 	fs, err := NewFileSystem(node, node.PrivateKey, "")

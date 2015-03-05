@@ -47,9 +47,16 @@ func NewFileSystem(ipfs *core.IpfsNode, sk ci.PrivKey, ipfspath string) (*FileSy
 }
 
 // Root constructs the Root of the filesystem, a Root object.
-func (f FileSystem) Root() (fs.Node, error) {
+func (f *FileSystem) Root() (fs.Node, error) {
 	log.Debug("Filesystem, get root")
 	return f.RootNode, nil
+}
+
+func (f *FileSystem) Destroy() {
+	err := f.RootNode.Close()
+	if err != nil {
+		log.Errorf("Error Shutting Down Filesystem: %s\n", err)
+	}
 }
 
 // Root is the root object of the filesystem tree.
@@ -67,10 +74,6 @@ type Root struct {
 }
 
 func CreateRoot(ipfs *core.IpfsNode, keys []ci.PrivKey, ipfspath string) (*Root, error) {
-	fi, err := nsfs.NewFilesystem(ipfs, keys...)
-	if err != nil {
-		return nil, err
-	}
 	ldirs := make(map[string]fs.Node)
 	roots := make(map[string]*nsfs.KeyRoot)
 	for _, k := range keys {
@@ -79,7 +82,7 @@ func CreateRoot(ipfs *core.IpfsNode, keys []ci.PrivKey, ipfspath string) (*Root,
 			return nil, err
 		}
 		name := u.Key(pkh).B58String()
-		root, err := fi.GetRoot(name)
+		root, err := ipfs.IpnsFs.GetRoot(name)
 		if err != nil {
 			return nil, err
 		}
@@ -90,14 +93,14 @@ func CreateRoot(ipfs *core.IpfsNode, keys []ci.PrivKey, ipfspath string) (*Root,
 		case *nsfs.Directory:
 			ldirs[name] = &Directory{val}
 		case nsfs.File:
-			ldirs[name] = &File{val}
+			ldirs[name] = &File{fi: val}
 		default:
 			return nil, errors.New("unrecognized type")
 		}
 	}
 
 	return &Root{
-		fs:        fi,
+		fs:        ipfs.IpnsFs,
 		Ipfs:      ipfs,
 		IpfsRoot:  ipfspath,
 		Keys:      keys,
@@ -147,6 +150,24 @@ func (s *Root) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	}
 
 	return &Link{s.IpfsRoot + "/" + resolved.B58String()}, nil
+}
+
+func (r *Root) Close() error {
+	for _, kr := range r.Roots {
+		err := kr.Publish(r.Ipfs.Context())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Forget is called when the filesystem is unmounted. probably.
+func (r *Root) Forget() {
+	err := r.Close()
+	if err != nil {
+		log.Error(err)
+	}
 }
 
 // ReadDirAll reads a particular directory. Will show locally available keys
@@ -205,6 +226,8 @@ type Directory struct {
 
 type File struct {
 	fi nsfs.File
+
+	fs.NodeRef
 }
 
 /*
@@ -245,7 +268,7 @@ func (s *Directory) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	case *nsfs.Directory:
 		return &Directory{child}, nil
 	case nsfs.File:
-		return &File{child}, nil
+		return &File{fi: child}, nil
 	default:
 		panic("system has proven to be insane")
 	}
@@ -355,7 +378,7 @@ func (dir *Directory) Create(ctx context.Context, req *fuse.CreateRequest, resp 
 		return nil, nil, errors.New("child creation failed")
 	}
 
-	nodechild := &File{fi}
+	nodechild := &File{fi: fi}
 	return nodechild, nodechild, nil
 }
 
